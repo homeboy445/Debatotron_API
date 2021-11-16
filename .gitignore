@@ -1,3 +1,5 @@
 .vscode
 node_modules
 connect-session-knex.sqlite
+.env
+auth.rest

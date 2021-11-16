@@ -1,106 +1,155 @@
-require("dotenv").config();
 const express = require("express");
+const PORT = process.env.PORT || 3005;
 const app = express();
 const http = require("http").createServer(app);
-const io = require("socket.io")(http);
-const session = require("express-session");
-const flash = require("express-flash");
-const cookieParser = require("cookie-parser");
-const passport = require("passport");
-const bodyparser = require("body-parser");
+const jwt = require("jsonwebtoken");
 const {
   FindNameintheTarget,
   AppendMessageToInbox,
   RemoveFriendRequest,
-  AddFriend,
   GroupComments,
   MatchUsersAndSendMessage,
-  extractNameFromComment,
+  getImagebyUser,
 } = require("./Utility");
-const initialize = require("./passport.config");
 const Register = require("./Register");
-const KnexStore = require("connect-session-knex")(session);
-const StoreComments = require("./StoreComments");
-const UserChecker = require("./UserChecker");
-const StoreMessage = require("./StoreMessage");
-const MethodOverride = require("method-override");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const saltRounds = 10;
 const knex = require("knex");
-const { application } = require("express");
 const postgres = knex({
   client: "pg",
-  connection: {
-    host: "127.0.0.1",
-    user: "postgres",
-    password: "",
-    database: "debatotron",
-  },
+  connection: process.env.DATABASE_URL,
 });
 
 /**
- * & -> Not important and doesn't require the user to send
+ * '&' : Not important and doesn't require the user to send
  * any request.
  *
- *   Types of requests
- *  Code '-1' : " Welcome to the debatotron message&",
- *  Code '0' : " Request Access to a debate",
- *  Code '1' : " Make a friend request",
- *  Code '2' : " Access to the debate granted&",
+ *  --Types of requests--
+ *  Code '-1' : " Welcome to the debatotron message&"
+ *  Code '0' : " Request Access to a debate"
+ *  Code '1' : " Make a friend request"
+ *  Code '2' : " Access to the debate granted&"
  *  Code '3' : " Friend Request Accepted&"
  *  Code '4' : " Send Mentions"
  *  Code '5' : " Replied to a comment"
  *  Code '6' : " Liked a comment"
+ *  Code '7' : " Recieved a Message"
  */
-
-const store = new KnexStore({
-  postgres,
-  tablename: "sessions",
-});
-
-initialize.IntializePassport(passport, postgres);
 
 app.use(cors());
 app.use(express.json());
-app.use(
-  session({
-    secret: "NFDNEKFNdkjfnvsknvlkenvf",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 2 * 1000 * 60 * 60 * 24,
-    },
-    store: store,
-  })
-);
 
-app.use(cookieParser("NFDNEKFNdkjfnvsknvlkenvf"));
-app.use(flash());
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(MethodOverride("_method"));
+const getJwtToken = async (email, hash) => {
+  const token = {};
+  token.accessToken = jwt.sign(
+    { email: email, password: hash },
+    process.env.ACCESS_TOKEN_KEY,
+    {
+      expiresIn: "15m",
+    }
+  );
+  token.refreshToken = jwt.sign(
+    { email: email, password: hash },
+    process.env.REFRESH_TOKEN_KEY,
+    {
+      expiresIn: "100h",
+    }
+  );
+  token.id = await postgres
+    .select("id")
+    .from("users")
+    .where({ email: email })
+    .then((response) => response[0].id);
+  return await postgres
+    .insert({ token: token.refreshToken })
+    .into("tokens")
+    .then((response) => {
+      return token;
+    })
+    .catch((err) => {
+      return false;
+    });
+};
 
-app.post("/signin", (req, res, next) => {
-  try {
-    passport.authenticate("local", (err, user, info) => {
-      if (err) throw err;
-      if (!user) {
-        return res.json(null);
+app.post("/signin", (req, res) => {
+  const { email, password } = req.body;
+  postgres
+    .select("hash")
+    .from("login")
+    .where({ email: email })
+    .then(async (response) => {
+      if (response.length === 0) {
+        throw response;
       }
-      req.logIn(user, (err) => {
-        if (err) throw err;
-        res.json({ id: user.id });
-      });
-    })(req, res, next);
-  } catch (err) {
-    res.status(400).json("error!");
-  }
+      if (!bcrypt.compareSync(password, response[0].hash)) {
+        return res.sendStatus(401);
+      }
+      const token = await getJwtToken(email, response[0].hash);
+      if (!token) {
+        return res.sendState(401);
+      }
+      res.json(token);
+    });
 });
 
 app.post("/register", (req, res) => {
   Register.HandleRegister(req, res, postgres, bcrypt, saltRounds, uuidv4);
+});
+
+// Middleware
+
+const authenticate = (req, res, next) => {
+  const header = req.headers["authorization"];
+  try {
+    const token = header.split(" ")[1];
+    if (token === null) {
+      return res.sendStatus(401);
+    }
+    if (jwt.verify(token, process.env.ACCESS_TOKEN_KEY)) {
+      return next();
+    }
+    throw token;
+  } catch (e) {
+    res.sendStatus(401);
+  }
+};
+
+//
+
+app.post("/refresh", (req, res) => {
+  const { refreshToken } = req.body;
+  postgres
+    .select("token")
+    .from("tokens")
+    .where({ token: refreshToken })
+    .then(async (response) => {
+      if (response.length > 0) {
+        try {
+          const user_data = jwt.verify(
+            refreshToken,
+            process.env.REFRESH_TOKEN_KEY
+          );
+          const token = await getJwtToken(user_data.email, user_data.password);
+          if (!token) {
+            throw response;
+          }
+          return res.json(token);
+        } catch (e) {
+          return res.sendStatus(401);
+        }
+      } else {
+        throw response;
+      }
+    })
+    .catch((err) => {
+      res.sendStatus(401);
+    });
+});
+
+app.get("/", authenticate, (req, authenticate, res) => {
+  res.json("Hey!");
 });
 
 app.post("/ForgotPassword", (req, res) => {
@@ -164,7 +213,7 @@ app.post("/ChangePassword", (req, res) => {
     });
 });
 
-app.post("/save", (req, res) => {
+app.post("/save", authenticate, (req, res) => {
   const {
     uniqid,
     title,
@@ -208,7 +257,7 @@ app.post("/save", (req, res) => {
     });
 });
 
-app.get("/getdebdata/:debid", (req, res) => {
+app.get("/getdebdata/:debid", authenticate, (req, res) => {
   const { debid } = req.params;
   postgres
     .select("*")
@@ -222,7 +271,25 @@ app.get("/getdebdata/:debid", (req, res) => {
     });
 });
 
-app.get("/profile_Data/:user", (req, res) => {
+app.post("/isdebatevalid", authenticate, (req, res) => {
+  const { id } = req.body;
+  postgres
+    .select("debid")
+    .from("debate")
+    .where({ debid: id })
+    .then((response) => {
+      console.log(response);
+      if (response.length > 0) {
+        return res.json(true);
+      }
+      throw response;
+    })
+    .catch((err) => {
+      return res.json(false);
+    });
+});
+
+app.get("/profile_Data/:user", authenticate, (req, res) => {
   const { user } = req.params;
   postgres
     .select("name", "joinedat", "access", "about", "profile_image")
@@ -236,21 +303,28 @@ app.get("/profile_Data/:user", (req, res) => {
     });
 });
 
-app.get("/profile/:id", (req, res) => {
+app.get("/profile/:id", authenticate, (req, res) => {
   const { id } = req.params;
   postgres
-    .select("name", "id")
+    .select("name", "id", "profile_image")
     .from("users")
     .where("id", "=", id)
     .then((response) => {
-      res.json(response);
+      response = response[0];
+      res.json([
+        {
+          id: response.id,
+          name: response.name,
+          image: response.profile_image,
+        },
+      ]);
     })
     .catch((err) => {
-      res.status(400).json("Failed to Load Resources!");
+      res.status(500).json("Failed to Load Resources!");
     });
 });
 
-app.get("/debcount/:user", (req, res) => {
+app.get("/debcount/:user", authenticate, (req, res) => {
   const { user } = req.params;
   var user_object = [];
   postgres
@@ -268,7 +342,7 @@ app.get("/debcount/:user", (req, res) => {
     });
 });
 
-app.get("/MakeDebRequest/:ReqStr", (req, res) => {
+app.get("/MakeDebRequest/:ReqStr", authenticate, (req, res) => {
   const { ReqStr } = req.params,
     vl = ReqStr.split(":");
   postgres("requests")
@@ -307,12 +381,11 @@ app.get("/MakeDebRequest/:ReqStr", (req, res) => {
         });
     })
     .catch((err) => {
-      console.log(err);
       res.status(400).json("Error!");
     });
 });
 
-app.get("/IsRoomRequested/:ReqStr", (req, res) => {
+app.get("/IsRoomRequested/:ReqStr", authenticate, (req, res) => {
   const { ReqStr } = req.params;
   postgres
     .select("*")
@@ -329,8 +402,8 @@ app.get("/IsRoomRequested/:ReqStr", (req, res) => {
     });
 });
 
-app.get("/returnAllUsers", (req, res) => {
-  postgres
+app.get("/returnAllUsers", authenticate, (req, res) => {
+  postgres //Redundant
     .select("name")
     .from("users")
     .then((response) => {
@@ -341,7 +414,7 @@ app.get("/returnAllUsers", (req, res) => {
     });
 });
 
-app.post("/AddParticipant", (req, res) => {
+app.post("/AddParticipant", authenticate, (req, res) => {
   const { debid, participant } = req.body;
   postgres("privatedebates")
     .select("*")
@@ -381,7 +454,7 @@ app.post("/AddParticipant", (req, res) => {
     });
 });
 
-app.post("/removeMessage", (req, res) => {
+app.post("/removeMessage", authenticate, (req, res) => {
   const { mId } = req.body;
   postgres("inbox")
     .where({ messageid: mId })
@@ -394,9 +467,9 @@ app.post("/removeMessage", (req, res) => {
     });
 });
 
-app.get("/CheckAccess/:id/:name", (req, res) => {
+app.get("/CheckAccess/:id/:name", authenticate, (req, res) => {
   const { id, name } = req.params;
-  postgres("privatedebates")
+  postgres("privatedebates") //Redundant
     .select("*")
     .where({
       dbid: id,
@@ -417,7 +490,7 @@ app.get("/CheckAccess/:id/:name", (req, res) => {
     });
 });
 
-app.get("/getDebates/:name", (req, res) => {
+app.get("/getDebates/:name", authenticate, (req, res) => {
   const { name } = req.params;
   postgres
     .select("*")
@@ -433,7 +506,7 @@ app.get("/getDebates/:name", (req, res) => {
     });
 });
 
-app.get("/getActivity/:name", async (req, res) => {
+app.get("/getActivity/:name", authenticate, async (req, res) => {
   const { name } = req.params;
   let result = [];
   /**
@@ -500,7 +573,7 @@ app.get("/getActivity/:name", async (req, res) => {
   }
 });
 
-app.get("/friends/:name", (req, res) => {
+app.get("/friends/:name", authenticate, (req, res) => {
   const { name } = req.params;
   postgres
     .select("*")
@@ -514,13 +587,14 @@ app.get("/friends/:name", (req, res) => {
     });
 });
 
-app.post("/MakeFriendReq", (req, res) => {
+app.post("/MakeFriendReq", authenticate, (req, res) => {
   const { user, fuser, message } = req.body;
   /*
     Currently, the status of the request would be false if the friend request
     already exists and I think it's better to modify it to something more descriptive.
   */
   postgres("friends")
+    .returning("*")
     .insert({
       user_name: user,
       friend_name: fuser,
@@ -542,18 +616,49 @@ app.post("/MakeFriendReq", (req, res) => {
         messageid: uuidv4(),
       };
       let res = await AppendMessageToInbox(postgres, data);
-      res.json(res);
+      res.json(response);
     })
     .catch((err) => {
+      console.log(err);
       res.status(400).json(null);
     });
 });
 
-app.post("/AddFriend", async (req, res) => {
+app.post("/AddFriend", authenticate, (req, res) => {
+  /**
+   *  Add user1 is the one who sent the request in the first place whereas user2
+   *  is who recieved it.
+   */
   const { user1, user2 } = req.body;
-  const rMes = (user) => {
-    return `<p>Hoo-ray! <a href="/Profile/${user}">${user}</a> has accepted your friend request! You guys are pals now... ENJOY!</p>`;
-  };
+  postgres("friends")
+    .update({ status: true })
+    .where({ user_name: user1, friend_name: user2 })
+    .then(async (response) => {
+      const rMes = (user) => {
+        return `<p>Hoo-ray! <a href="/Profile/${user}">${user}</a> has accepted your friend request! You guys are pals now... ENJOY!</p>`;
+      };
+      let messageData = {
+        message: rMes(user1),
+        byuser: "DebManager",
+        touser: user2,
+        additional: JSON.stringify({
+          type: "request",
+          title: "Friend Request Accepted",
+          rtype: 3,
+        }),
+        messageid: uuidv4(),
+      };
+      await AppendMessageToInbox(postgres, messageData);
+      res.json("Done!");
+    })
+    .catch((err) => res.status(400).json("Failed!"));
+});
+
+/*app.post("/AddFriend", authenticate, async (req, res) => {
+    const { user1, user2 } = req.body;
+    const rMes = (user) => {
+      return `<p>Hoo-ray! <a href="/Profile/${user}">${user}</a> has accepted your friend request! You guys are pals now... ENJOY!</p>`;
+    };
   let messageData = {
     message: rMes(user1),
     byuser: "DebManager",
@@ -569,28 +674,49 @@ app.post("/AddFriend", async (req, res) => {
   res.json(result);
   messageData.message = rMes(user2);
   await AddFriend(postgres, user2, user1, messageData);
-});
+});*/
 
-app.get("/friendslist/:user", (req, res) => {
+app.get("/friendslist/:user", authenticate, (req, res) => {
   const { user } = req.params;
-  postgres("friendslist")
-    .select("friends")
-    .where({ username: user })
-    .then((response) => {
-      res.json(JSON.parse(response[0].friends));
+  postgres("friends")
+    .select("friend_name", "status")
+    .where({ user_name: user })
+    .then(async (response) => {
+      let response1 = await postgres("friends")
+        .select("user_name", "status")
+        .where({ friend_name: user })
+        .then((response) => {
+          return response;
+        });
+      let result = [];
+      response.map((item) => {
+        result.push({ ...item, owner: true });
+      });
+      response1.map((item) => {
+        let k = {
+          friend_name: item.user_name,
+          owner: false,
+          status: item.status,
+        };
+        result.push(k);
+      });
+      for (let i = 0; i < result.length; i++) {
+        result[i].image = await getImagebyUser(postgres, result[i].friend_name);
+      }
+      res.json(result);
     })
     .catch((err) => {
       res.status(404).json(false);
     });
 });
 
-app.post("/DeclineFriendReq", async (req, res) => {
+app.post("/DeclineFriendReq", authenticate, async (req, res) => {
   const { user1, user2 } = req.body;
   const result = await RemoveFriendRequest(postgres, user1, user2);
   res.json(result);
 });
 
-app.get("/GetDebs/:type", (req, res) => {
+app.get("/GetDebs/:type", authenticate, (req, res) => {
   const { type } = req.params;
   postgres
     .select("*")
@@ -604,7 +730,7 @@ app.get("/GetDebs/:type", (req, res) => {
     });
 });
 
-app.get("/Inbox/:user", (req, res) => {
+app.get("/Inbox/:user", authenticate, (req, res) => {
   const { user } = req.params;
   postgres
     .select("*")
@@ -621,7 +747,7 @@ app.get("/Inbox/:user", (req, res) => {
     });
 });
 
-app.get("/WipeInbox/:user", (req, res) => {
+app.get("/WipeInbox/:user", authenticate, (req, res) => {
   const { user } = req.params;
   postgres("inbox")
     .where("touser", "=", user)
@@ -630,12 +756,11 @@ app.get("/WipeInbox/:user", (req, res) => {
       res.json("Done!");
     })
     .catch((err) => {
-      console.log(err);
       res.status("400").json("Error!");
     });
 });
 
-app.get("/Draft/:user", (req, res) => {
+app.get("/Draft/:user", authenticate, (req, res) => {
   const { user } = req.params;
   postgres
     .select("topic", "debid")
@@ -652,7 +777,7 @@ app.get("/Draft/:user", (req, res) => {
     });
 });
 
-app.get("/deletedeb/:id", (req, res) => {
+app.get("/deletedeb/:id", authenticate, (req, res) => {
   const { id } = req.params;
   postgres("debate")
     .where("debid", "=", id)
@@ -665,7 +790,26 @@ app.get("/deletedeb/:id", (req, res) => {
     });
 });
 
-app.get("/getComments/:id", (req, res) => {
+app.post("/sendMessage", authenticate, async (req, res) => {
+  const { sender, recipient, message } = req.body;
+  const inboxData = {
+    message: message,
+    byuser: sender,
+    touser: recipient,
+    additional: JSON.stringify({
+      type: "message",
+      user: sender,
+      debid: "none",
+      title: `You've recieved a message from ${sender}`,
+      rtype: 7,
+    }),
+    messageid: uuidv4(),
+  };
+  await AppendMessageToInbox(postgres, inboxData);
+  res.json("Sent!");
+});
+
+app.get("/getComments/:id", authenticate, (req, res) => {
   const { id } = req.params;
   postgres
     .select("*")
@@ -682,7 +826,7 @@ app.get("/getComments/:id", (req, res) => {
     });
 });
 
-app.post("/makeComment", (req, res) => {
+app.post("/makeComment", authenticate, (req, res) => {
   const { comment, commentId, user, userId, debateId, parentId, date } =
     req.body;
   postgres
@@ -748,11 +892,11 @@ app.post("/makeComment", (req, res) => {
       return res.json("Done!");
     })
     .catch((err) => {
-      return res.status(400).json("Failed!");
+      return res.status(500).json("Failed!");
     });
 });
 
-app.post("/updateParticipation", (req, res) => {
+app.post("/updateParticipation", authenticate, (req, res) => {
   const { debId, userId, user, status } = req.body;
   postgres
     .insert({
@@ -770,7 +914,7 @@ app.post("/updateParticipation", (req, res) => {
     });
 });
 
-app.get("/getParticipation/:debid", (req, res) => {
+app.get("/getParticipation/:debid", authenticate, (req, res) => {
   const { debid } = req.params;
   postgres
     .select("*")
@@ -778,15 +922,22 @@ app.get("/getParticipation/:debid", (req, res) => {
     .where({
       debid: debid,
     })
-    .then((response) => {
+    .then(async (response) => {
+      for (let i = 0; i < response.length; i++) {
+        response[i].image = await getImagebyUser(
+          postgres,
+          response[i].username
+        );
+      }
       res.json(response);
     })
     .catch((err) => {
+      console.log(err);
       res.status(404).json("Not Found!");
     });
 });
 
-app.get("/getLikes/:debId/:userId", (req, res) => {
+app.get("/getLikes/:debId/:userId", authenticate, (req, res) => {
   const { debId, userId } = req.params;
   postgres
     .select("commentid")
@@ -803,7 +954,7 @@ app.get("/getLikes/:debId/:userId", (req, res) => {
     });
 });
 
-app.post("/changeSide", (req, res) => {
+app.post("/changeSide", authenticate, (req, res) => {
   const { debid, id, status } = req.body;
   postgres("participation")
     .update({
@@ -821,7 +972,7 @@ app.post("/changeSide", (req, res) => {
     });
 });
 
-app.post("/UpdateLike", (req, res) => {
+app.post("/UpdateLike", authenticate, (req, res) => {
   const { debId, user, userId, commentId, comment, value, state } = req.body;
   postgres("comments")
     .update({
@@ -858,18 +1009,16 @@ app.post("/UpdateLike", (req, res) => {
         messageid: uuidv4(),
       };
       if (state) {
-        console.log("CALLED!");
         await AppendMessageToInbox(postgres, inboxData);
       }
       return res.json(r);
     })
     .catch((err) => {
-      console.log(err);
-      res.status(400).json("Failed!");
+      res.status(500).json("Failed!");
     });
 });
 
-app.post("/UpdateProfile", (req, res) => {
+app.post("/UpdateProfile", authenticate, (req, res) => {
   const { user, about, image } = req.body;
   postgres("users")
     .where("name", "=", user)
@@ -881,14 +1030,13 @@ app.post("/UpdateProfile", (req, res) => {
       res.json("Done!");
     })
     .catch((err) => {
-      console.log(err);
       res.status(400).json("An Error has occured!");
     });
 });
 
 // FEED API
 
-app.post("/makePost", (req, res) => {
+app.post("/makePost", authenticate, (req, res) => {
   const { user, userId, post, date } = req.body;
   postgres
     .insert({
@@ -907,11 +1055,11 @@ app.post("/makePost", (req, res) => {
     });
 });
 
-app.get("/popularUsers", (req, res) => {
+app.get("/popularUsers", authenticate, (req, res) => {
   postgres
     .select("byuser", "likes")
     .from("comments")
-    .then((response) => {
+    .then(async (response) => {
       let result = response.sort((c1, c2) => {
         return c1.likes < c2.likes ? 1 : c1.likes > c2.likes ? -1 : 0;
       });
@@ -920,20 +1068,27 @@ app.get("/popularUsers", (req, res) => {
         if (finalResults.length > 5) {
           return null;
         }
-        finalResults.add(item.byuser);
+        finalResults.add({ name: item.byuser });
       });
-      res.json([...finalResults]);
+      finalResults = [...finalResults];
+      for (let i = 0; i < finalResults.length; i++) {
+        finalResults[i].image = await getImagebyUser(
+          postgres,
+          finalResults[i].name
+        );
+      }
+      res.json(finalResults);
     })
     .catch((err) => {
       res.status(400).json("Failed to fetch!");
     });
 });
 
-app.get("/topContributors", (req, res) => {
+app.get("/topContributors", authenticate, (req, res) => {
   postgres
     .select("publisher")
     .from("debate")
-    .then((response) => {
+    .then(async (response) => {
       let obj = {};
       response.map((item) => {
         if (obj[item.publisher] !== undefined) {
@@ -952,8 +1107,14 @@ app.get("/topContributors", (req, res) => {
         if (finalResults.length > 10) {
           return null;
         }
-        finalResults.push(item.name);
+        finalResults.push({ name: item.name });
       });
+      for (let i = 0; i < finalResults.length; i++) {
+        finalResults[i].image = await getImagebyUser(
+          postgres,
+          finalResults[i].name
+        );
+      }
       res.json(finalResults);
     })
     .catch((err) => {
@@ -961,7 +1122,7 @@ app.get("/topContributors", (req, res) => {
     });
 });
 
-app.get("/feed/:id", (req, res) => {
+app.get("/feed/:id", authenticate, (req, res) => {
   const { id } = req.params; //TODO: Alter this route to show the results specify to a particular user.
   let feed = [];
   postgres
@@ -1001,16 +1162,20 @@ app.get("/feed/:id", (req, res) => {
           b = new Date(c2.publishedAt);
         return a < b ? 1 : a > b ? -1 : 0;
       });
+      for (let i = 0; i < result.length; i++) {
+        result[i].image = await getImagebyUser(postgres, result[i].user);
+      }
       res.json(result);
     })
     .catch((err) => {
+      console.log(err);
       res.status(400).json("Failed to fetch!");
     });
 });
 
 // END OF FEED API
 
-app.post("/reportUser", (req, res) => {
+app.post("/reportUser", authenticate, (req, res) => {
   const { debateId, userId, reporterId } = req.body;
   postgres
     .select("*")
@@ -1041,54 +1206,18 @@ app.post("/reportUser", (req, res) => {
 });
 
 app.delete("/signout", (req, res) => {
-  req.logOut();
-  res.json("Logged out Successfully!");
-  console.log("Logged out!");
+  const { refreshToken } = req.body;
+  postgres("tokens")
+    .del()
+    .where({ token: refreshToken })
+    .then((response) => {
+      res.json("Done!");
+    })
+    .catch((err) => {
+      res.status(404).json("Failed!");
+    });
 });
 
-// io.on("connection", (socket) => {
-//   socket.on("test", (data) => {
-//     console.log("->", data);
-//   });
-//   socket.broadcast.emit("recieve", true);
-//   socket.on("live", (room) => {
-//     console.log("User's Live!");
-//     socket.join(room);
-//   });
-//   socket.on("test", (data) => {
-//     console.log("Test Successfull!");
-//   });
-//   socket.on("make-comment", async (data) => {
-//     console.log("data-recieved!");
-//     const UserReference = UserChecker.UserParser(data.comment);
-//     var result = "";
-//     if (UserReference != null) {
-//       result = await postgres
-//         .select("name")
-//         .from("users")
-//         .where("name", "=", UserReference)
-//         .then((response) => {
-//           return response;
-//         })
-//         .catch((err) => {
-//           return "No such user exists!";
-//         });
-//       console.log(result, " ", UserReference);
-//       if (result.length > 0) {
-//         var object = {
-//           byuser: data.byuser,
-//           touser: UserReference,
-//           message: `You've Been Mentioned By @${data.byuser}`,
-//         };
-//         StoreMessage.Store_Message(object, postgres);
-//       }
-//     }
-//     StoreComments.StoreComment(data, postgres);
-//     socket.join(data.room);
-//     socket.broadcast.to(data.room).emit("comment", data);
-//   });
-// });
-
-http.listen(3005, () => {
-  console.log("Server is Running at port 3005");
+http.listen(PORT, () => {
+  console.log(`Server is Running at port ${PORT}`);
 });

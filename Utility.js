@@ -32,6 +32,16 @@ const RemoveFriendRequest = async (postgres, user1, user2) => {
     });
 };
 
+const getImagebyUser = async (postgres, user) => {
+  return await postgres
+    .select("profile_image")
+    .where({ name: user })
+    .from("users")
+    .then((response1) => {
+      return response1[0].profile_image;
+    });
+};
+
 const AddFriend = async (postgres, user1, user2, messageData) => {
   let data = await postgres("friendslist")
     .select("friends")
@@ -198,4 +208,5 @@ module.exports = {
   GroupComments,
   extractNameFromComment,
   MatchUsersAndSendMessage,
+  getImagebyUser
 };

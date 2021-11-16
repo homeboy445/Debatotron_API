@@ -41,6 +41,8 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
               access: "public",
               recovery: recovery,
               answer: answer_hash,
+              profile_image: Math.random().toString(),
+              about: "A debatotron user."
             })
             .then((user) => {
               res.json(user);
@@ -57,7 +59,7 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
                   messageid: uuidv4(),
                 })
                 .then((response) => {
-                  console.log(response);
+                  return;
                 });
             });
         })
@@ -69,5 +71,5 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
     });
 };
 module.exports = {
-  HandleRegister: HandleRegister,
+  HandleRegister,
 };
