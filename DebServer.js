@@ -148,8 +148,8 @@ app.post("/refresh", (req, res) => {
     });
 });
 
-app.get("/", authenticate, (req, authenticate, res) => {
-  res.json("Hey!");
+app.get("/", (req, res) => {
+  res.json("The Server's Live!");
 });
 
 app.post("/ForgotPassword", (req, res) => {
