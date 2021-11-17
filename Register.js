@@ -33,7 +33,7 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
         .returning("email")
         .then((LoginEmail) => {
           return trx("users")
-            .returning("*")
+            .returning("id", "name")
             .insert({
               email: LoginEmail[0],
               name: user,
