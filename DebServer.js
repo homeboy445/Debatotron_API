@@ -17,9 +17,17 @@ const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const saltRounds = 10;
 const knex = require("knex");
+
 const postgres = knex({
   client: "pg",
   connection: process.env.DATABASE_URL,
+  production: {
+    client: "pg",
+    connection: {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    },
+  },
 });
 
 /**
