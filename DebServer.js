@@ -20,7 +20,10 @@ const knex = require("knex");
 
 const postgres = knex({
   client: "pg",
-  connection: process.env.DATABASE_URL,
+  connection:  {
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  },
   production: {
     client: "pg",
     connection: {
