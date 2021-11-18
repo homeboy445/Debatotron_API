@@ -291,7 +291,7 @@ app.post("/isdebatevalid", authenticate, (req, res) => {
     .from("debate")
     .where({ debid: id })
     .then((response) => {
-      if (response.length === 0) {
+      if (response.length > 0) {
         return res.json(true);
       }
       throw response;
