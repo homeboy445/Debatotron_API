@@ -20,7 +20,7 @@ const knex = require("knex");
 
 const postgres = knex({
   client: "pg",
-  connection:  {
+  connection: {
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
   },
@@ -1214,6 +1214,20 @@ app.post("/reportUser", authenticate, (req, res) => {
     })
     .catch((err) => {
       res.status(400).json("Request already administed!");
+    });
+});
+
+app.get("/tutorial/:user", authenticate, (req, res) => {
+  const { user } = req.params;
+  postgres
+    .select("*")
+    .from("tutorials")
+    .where({ username: user })
+    .then((response) => {
+      res.json(response);
+    })
+    .catch((err) => {
+      res.status(400).json("Failed!");
     });
 });
 
