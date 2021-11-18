@@ -274,7 +274,7 @@ app.get("/getdebdata/:debid", authenticate, (req, res) => {
     .from("debate")
     .where("debid", "=", debid)
     .then((response) => {
-      if (response.length === 0) {
+      if (response.length !== 0) {
         return res.json(false);
       }
       res.json(response);
