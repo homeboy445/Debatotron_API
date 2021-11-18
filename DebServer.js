@@ -1221,7 +1221,7 @@ app.get("/tutorial/:user", authenticate, (req, res) => {
   const { user } = req.params;
   postgres
     .select("*")
-    .from("tutorials")
+    .from("tutorial")
     .where({ username: user })
     .then((response) => {
       res.json(response);
