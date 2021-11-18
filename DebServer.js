@@ -245,7 +245,6 @@ app.post("/save", authenticate, (req, res) => {
       publishedat: publishedat,
       publisher: publisher,
       flag: flag,
-      imglink: link,
       category: category,
       access: access,
     })
@@ -264,7 +263,8 @@ app.post("/save", authenticate, (req, res) => {
         });
     })
     .catch((err) => {
-      res.status(404).json("Error!");
+      console.log(err);
+      res.status(500).json("Error!");
     });
 });
 
