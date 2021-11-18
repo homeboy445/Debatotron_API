@@ -1231,6 +1231,24 @@ app.get("/tutorial/:user", authenticate, (req, res) => {
     });
 });
 
+app.patch("/tutorial", (req, res) => {
+  const { user, debateStatus, profileStatus } = req.body;
+  postgres("tutorial")
+    .update({
+      debatepage: debateStatus,
+      profilepage: profileStatus,
+    })
+    .where({
+      username: user,
+    })
+    .then((response) => {
+      res.json("Done!");
+    })
+    .catch((err) => {
+      res.status(400).json("Failed!");
+    });
+});
+
 app.delete("/signout", (req, res) => {
   const { refreshToken } = req.body;
   postgres("tokens")
