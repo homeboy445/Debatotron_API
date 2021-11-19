@@ -45,6 +45,7 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
               about: "A debatotron user.",
             })
             .then((user) => {
+              console.log(user);
               res.json(user);
               postgres
                 .insert({
