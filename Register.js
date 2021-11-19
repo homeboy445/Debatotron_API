@@ -32,8 +32,9 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
         .into("login")
         .returning("email")
         .then((LoginEmail) => {
+          console.log("-----");
           return trx("users")
-            .returning("id", "name")
+            .returning("*")
             .insert({
               email: LoginEmail[0],
               name: user,
@@ -44,7 +45,8 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
               profile_image: Math.random().toString(),
               about: "A debatotron user.",
             })
-            .then((user) => {
+            .then((response) => {
+              const user = {name: response[0].name, id: response[0].id};
               console.log(user);
               res.json(user);
               postgres
