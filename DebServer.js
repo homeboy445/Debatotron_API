@@ -666,28 +666,6 @@ app.post("/AddFriend", authenticate, (req, res) => {
     .catch((err) => res.status(400).json("Failed!"));
 });
 
-/*app.post("/AddFriend", authenticate, async (req, res) => {
-    const { user1, user2 } = req.body;
-    const rMes = (user) => {
-      return `<p>Hoo-ray! <a href="/Profile/${user}">${user}</a> has accepted your friend request! You guys are pals now... ENJOY!</p>`;
-    };
-  let messageData = {
-    message: rMes(user1),
-    byuser: "DebManager",
-    touser: user2,
-    additional: JSON.stringify({
-      type: "request",
-      title: "Friend Request Accepted",
-      rtype: 3,
-    }),
-    messageid: uuidv4(),
-  };
-  var result = await AddFriend(postgres, user1, user2, messageData);
-  res.json(result);
-  messageData.message = rMes(user2);
-  await AddFriend(postgres, user2, user1, messageData);
-});*/
-
 app.get("/friendslist/:user", authenticate, (req, res) => {
   const { user } = req.params;
   postgres("friends")
@@ -747,7 +725,7 @@ app.get("/Inbox/:user", authenticate, (req, res) => {
   postgres
     .select("*")
     .from("inbox")
-    .where("touser", "=", user)
+    .where({touser: user})
     .then((response) => {
       if (response.length < 1) {
         return res.json("none");
@@ -755,7 +733,7 @@ app.get("/Inbox/:user", authenticate, (req, res) => {
       res.json(response);
     })
     .catch((err) => {
-      res.status(400).json("An Error has occured!");
+      res.status(400).json("Failed!");
     });
 });
 
