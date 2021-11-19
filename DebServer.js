@@ -34,9 +34,6 @@ const postgres = knex({
 });
 
 /**
- * '&' : Not important and doesn't require the user to send
- * any request.
- *
  *  --Types of requests--
  *  Code '-1' : " Welcome to the debatotron message&"
  *  Code '0' : " Request Access to a debate"
@@ -102,7 +99,10 @@ app.post("/signin", (req, res) => {
         return res.sendState(401);
       }
       res.json(token);
-    });
+    }).catch(err=>{
+      console.log(err);
+      res.status(500).json("Failed!");
+    })
 });
 
 app.post("/register", (req, res) => {
