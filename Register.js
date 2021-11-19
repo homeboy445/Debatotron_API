@@ -42,10 +42,19 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
               recovery: recovery,
               answer: answer_hash,
               profile_image: Math.random().toString(),
-              about: "A debatotron user."
+              about: "A debatotron user.",
             })
             .then((user) => {
               res.json(user);
+              postgres
+                .insert({
+                  username: user[0].name,
+                  debatepage: true,
+                  profilepage: true,
+                })
+                .into("tutorial")
+                .then((response) => {})
+                .catch((err) => {});
               postgres("inbox")
                 .insert({
                   message: `Welcome to the Debatotron ${user[0].name}! We hope you'll like it here!`,
@@ -58,9 +67,8 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
                   }),
                   messageid: uuidv4(),
                 })
-                .then((response) => {
-                  return;
-                });
+                .then((response) => {})
+                .catch((err) => {});
             });
         })
         .then(trx.commit)
