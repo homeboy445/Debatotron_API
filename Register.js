@@ -32,7 +32,6 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
         .into("login")
         .returning("email")
         .then((LoginEmail) => {
-          console.log("-----");
           return trx("users")
             .returning("*")
             .insert({
@@ -47,11 +46,10 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
             })
             .then((response) => {
               const user = {name: response[0].name, id: response[0].id};
-              console.log(user);
               res.json(user);
               postgres
                 .insert({
-                  username: user[0].name,
+                  username: user.name,
                   debatepage: true,
                   profilepage: true,
                 })
@@ -60,9 +58,9 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
                 .catch((err) => {});
               postgres("inbox")
                 .insert({
-                  message: `Welcome to the Debatotron ${user[0].name}! We hope you'll like it here!`,
+                  message: `Welcome to the Debatotron ${user.name}! We hope you'll like it here!`,
                   byuser: "DebManager",
-                  touser: user[0].name,
+                  touser: user.name,
                   recievedat: new Date().toLocaleDateString(),
                   additional: JSON.stringify({
                     type: "request",
@@ -78,7 +76,6 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
         .catch(trx.rollback);
     })
     .catch((err) => {
-      console.log(err);
       res.status(400).json("unable to register!");
     });
 };
