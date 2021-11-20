@@ -16,6 +16,17 @@ const AppendMessageToInbox = async (postgres, data) => {
     });
 };
 
+const RemoveMessageFromInboxById = (postgres, id) => {
+  postgres("inbox")
+    .del()
+    .where({
+      messageid: id,
+    })
+    .then((response) => {
+      return;
+    });
+};
+
 const RemoveFriendRequest = async (postgres, user1, user2) => {
   return await postgres("friends")
     .where({
@@ -43,11 +54,11 @@ const getImagebyUser = async (postgres, user) => {
 
 /**
  * Generates a Json Web Token for the given values.
- * @param {*} jwt 
- * @param {*} postgres 
- * @param {*} email 
- * @param {*} hash 
- * @returns 
+ * @param {*} jwt
+ * @param {*} postgres
+ * @param {*} email
+ * @param {*} hash
+ * @returns
  */
 const getJwtToken = async (jwt, postgres, email, hash) => {
   const token = {};
@@ -202,4 +213,5 @@ module.exports = {
   MatchUsersAndSendMessage,
   getImagebyUser,
   getJwtToken,
+  RemoveMessageFromInboxById,
 };

@@ -11,6 +11,7 @@ const {
   MatchUsersAndSendMessage,
   getImagebyUser,
   getJwtToken,
+  RemoveMessageFromInboxById,
 } = require("./utility/Utility");
 const { Register } = require("./models/register/Register");
 const bcrypt = require("bcrypt");
@@ -587,34 +588,7 @@ app.post("/AddFriend", authenticate, async (req, res) => {
    *  is who recieved it.
    */
   const { user1, user2 } = req.body;
-  let status = await postgres("friends")
-    .select("*")
-    .where({ user_name: user1, friend_name: user2 })
-    .then((response) => {
-      if (response.length > 0) {
-        return true;
-      }
-      throw response;
-    })
-    .catch((err) => {
-      return false;
-    });
-  status |= await postgres("friends")
-    .select("*")
-    .where({ user_name: user2, friend_name: user1 })
-    .then((response) => {
-      if (response.length > 0) {
-        return true;
-      }
-      throw response;
-    })
-    .catch((err) => {
-      return false;
-    });
-  if (status) {
-    return res.json("Already sent!");
-  }
-  postgres("friends")
+  await postgres("friends")
     .update({ status: true })
     .where({ user_name: user1, friend_name: user2 })
     .then(async (response) => {
@@ -634,7 +608,25 @@ app.post("/AddFriend", authenticate, async (req, res) => {
       };
       await AppendMessageToInbox(postgres, messageData);
       res.json("Done!");
-      let result = postgres("inbox").select("*").where({});
+      postgres
+        .select("additional", "messageid")
+        .where({ touser: user2 })
+        .from("inbox")
+        .then(async (response) => {
+          let id = "-1";
+          response.map((item) => {
+            if (id !== "-1") {
+              return null;
+            }
+            const jsonObj = JSON.parse(item.additional);
+            if (jsonObj.rtype === 1) {
+              if (jsonObj.user === user1) {
+                return (id = item.messageid);
+              }
+            }
+          });
+          await RemoveMessageFromInboxById(postgres, id);
+        });
     })
     .catch((err) => res.status(400).json("Failed!"));
 });
