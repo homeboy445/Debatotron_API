@@ -596,9 +596,9 @@ app.post("/AddFriend", authenticate, async (req, res) => {
         return `<p>Hoo-ray! <a href="/Profile/${user}">${user}</a> has accepted your friend request! You guys are pals now... ENJOY!</p>`;
       };
       let messageData = {
-        message: rMes(user1),
+        message: rMes(user2),
         byuser: "DebManager",
-        touser: user2,
+        touser: user1,
         additional: JSON.stringify({
           type: "request",
           title: "Friend Request Accepted",
