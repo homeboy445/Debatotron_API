@@ -81,8 +81,12 @@ const getJwtToken = async (jwt, postgres, email, hash) => {
     .from("users")
     .where({ email: email })
     .then((response) => response[0].id);
+  await postgres("tokens")
+    .del()
+    .where({ id: token.id })
+    .then((response) => {});
   return await postgres
-    .insert({ token: token.refreshToken })
+    .insert({ token: token.refreshToken, id: token.id })
     .into("tokens")
     .then((response) => {
       return token;
