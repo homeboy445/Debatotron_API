@@ -10,13 +10,16 @@ const {
   GroupComments,
   MatchUsersAndSendMessage,
   getImagebyUser,
-} = require("./Utility");
-const Register = require("./Register");
+  getJwtToken,
+} = require("./utility/Utility");
+const { Register } = require("./models/register/Register");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const saltRounds = 10;
 const knex = require("knex");
+const { SignIn } = require("./models/signIn/SignIn");
+const { authenticate } = require("./middleware/Authenticate");
 
 const postgres = knex({
   client: "pg",
@@ -49,85 +52,14 @@ const postgres = knex({
 app.use(cors());
 app.use(express.json());
 
-const getJwtToken = async (email, hash) => {
-  const token = {};
-  token.accessToken = jwt.sign(
-    { email: email, password: hash },
-    process.env.ACCESS_TOKEN_KEY,
-    {
-      expiresIn: "15m",
-    }
-  );
-  token.refreshToken = jwt.sign(
-    { email: email, password: hash },
-    process.env.REFRESH_TOKEN_KEY,
-    {
-      expiresIn: "100h",
-    }
-  );
-  token.id = await postgres
-    .select("id")
-    .from("users")
-    .where({ email: email })
-    .then((response) => response[0].id);
-  return await postgres
-    .insert({ token: token.refreshToken })
-    .into("tokens")
-    .then((response) => {
-      return token;
-    })
-    .catch((err) => {
-      return false;
-    });
-};
-
 app.post("/signin", (req, res) => {
   const { email, password } = req.body;
-  postgres
-    .select("hash")
-    .from("login")
-    .where({ email: email })
-    .then(async (response) => {
-      if (response.length === 0) {
-        throw response;
-      }
-      if (!bcrypt.compareSync(password, response[0].hash)) {
-        return res.sendStatus(401);
-      }
-      const token = await getJwtToken(email, response[0].hash);
-      if (!token) {
-        return res.sendState(401);
-      }
-      res.json(token);
-    })
-    .catch((err) => {
-      res.status(500).json("Failed!");
-    });
+  SignIn(res, jwt, bcrypt, postgres, email, password, getJwtToken);
 });
 
 app.post("/register", (req, res) => {
-  Register.HandleRegister(req, res, postgres, bcrypt, saltRounds, uuidv4);
+  Register(req, res, postgres, bcrypt, saltRounds, uuidv4);
 });
-
-// Middleware
-
-const authenticate = (req, res, next) => {
-  const header = req.headers["authorization"];
-  try {
-    const token = header.split(" ")[1];
-    if (token === null) {
-      return res.sendStatus(401);
-    }
-    if (jwt.verify(token, process.env.ACCESS_TOKEN_KEY)) {
-      return next();
-    }
-    throw token;
-  } catch (e) {
-    res.sendStatus(401);
-  }
-};
-
-//
 
 app.post("/refresh", (req, res) => {
   const { refreshToken } = req.body;
@@ -142,7 +74,12 @@ app.post("/refresh", (req, res) => {
             refreshToken,
             process.env.REFRESH_TOKEN_KEY
           );
-          const token = await getJwtToken(user_data.email, user_data.password);
+          const token = await getJwtToken(
+            jwt,
+            postgres,
+            user_data.email,
+            user_data.password
+          );
           if (!token) {
             throw response;
           }
@@ -688,6 +625,7 @@ app.post("/AddFriend", authenticate, async (req, res) => {
       };
       await AppendMessageToInbox(postgres, messageData);
       res.json("Done!");
+      let result = postgres("inbox").select("*").where({});
     })
     .catch((err) => res.status(400).json("Failed!"));
 });

@@ -12,7 +12,6 @@ const AppendMessageToInbox = async (postgres, data) => {
       return true;
     })
     .catch((err) => {
-      console.log(err);
       return err;
     });
 };
@@ -42,50 +41,44 @@ const getImagebyUser = async (postgres, user) => {
     });
 };
 
-const AddFriend = async (postgres, user1, user2, messageData) => {
-  let data = await postgres("friendslist")
-    .select("friends")
-    .where({ username: user1 })
+/**
+ * Generates a Json Web Token for the given values.
+ * @param {*} jwt 
+ * @param {*} postgres 
+ * @param {*} email 
+ * @param {*} hash 
+ * @returns 
+ */
+const getJwtToken = async (jwt, postgres, email, hash) => {
+  const token = {};
+  token.accessToken = jwt.sign(
+    { email: email, password: hash },
+    process.env.ACCESS_TOKEN_KEY,
+    {
+      expiresIn: "15m",
+    }
+  );
+  token.refreshToken = jwt.sign(
+    { email: email, password: hash },
+    process.env.REFRESH_TOKEN_KEY,
+    {
+      expiresIn: "100h",
+    }
+  );
+  token.id = await postgres
+    .select("id")
+    .from("users")
+    .where({ email: email })
+    .then((response) => response[0].id);
+  return await postgres
+    .insert({ token: token.refreshToken })
+    .into("tokens")
     .then((response) => {
-      return response[0].friends;
+      return token;
     })
     .catch((err) => {
-      return [];
+      return false;
     });
-  if (data.length === 0) {
-    return await postgres("friendslist")
-      .insert({
-        username: user1,
-        friends: JSON.stringify([user2]),
-      })
-      .returning("*")
-      .then(async (response) => {
-        await RemoveFriendRequest(postgres, user2, user1);
-        await AppendMessageToInbox(postgres, messageData);
-        return true;
-      })
-      .catch((err) => {
-        return false;
-      });
-  } else {
-    data = eval(data);
-    data.push(user2);
-    return await postgres("friendslist")
-      .update({
-        friends: JSON.stringify(data),
-      })
-      .where({
-        username: user1,
-      })
-      .then(async (response) => {
-        await RemoveFriendRequest(postgres, user2, user1);
-        await AppendMessageToInbox(postgres, messageData);
-        return true;
-      })
-      .catch((err) => {
-        return false;
-      });
-  }
 };
 
 const sortTheArray = (data) => {
@@ -204,9 +197,9 @@ module.exports = {
   FindNameintheTarget,
   AppendMessageToInbox,
   RemoveFriendRequest,
-  AddFriend,
   GroupComments,
   extractNameFromComment,
   MatchUsersAndSendMessage,
-  getImagebyUser
+  getImagebyUser,
+  getJwtToken,
 };

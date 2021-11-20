@@ -11,7 +11,18 @@ const EmailParser = (email) => {
   str = email.substring(in1, inl);
   return str;
 };
-const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
+
+/**
+ * Function for registering user.
+ * @param {*} req 
+ * @param {*} res 
+ * @param {*} postgres 
+ * @param {*} bcrypt 
+ * @param {*} saltRounds 
+ * @param {*} uuidv4 
+ * @returns 
+ */
+const Register = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
   const { user, email, password, recovery, answer } = req.body;
   var mailP = EmailParser(email);
   if (!email || !user || !password) {
@@ -80,5 +91,5 @@ const HandleRegister = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
     });
 };
 module.exports = {
-  HandleRegister,
+  Register,
 };
