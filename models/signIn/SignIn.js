@@ -8,7 +8,7 @@
  * @param {*} password 
  * @param {*} getJwtToken 
  */
-const SignIn = (res, jwt, bcrypt, postgres, email, password, getJwtToken) => {
+const SignIn = async (res, jwt, bcrypt, postgres, email, password, getJwtToken) => {
   postgres
     .select("hash")
     .from("login")
