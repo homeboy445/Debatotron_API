@@ -74,6 +74,15 @@ app.post("/refresh", (req, res) => {
             refreshToken,
             process.env.REFRESH_TOKEN_KEY
           );
+          if (!user_data) {
+            await postgres("tokens")
+              .del()
+              .where({ token: refreshToken })
+              .then((response) => {
+                throw response;
+              });
+            throw user_data;
+          }
           const token = await getJwtToken(
             jwt,
             postgres,
