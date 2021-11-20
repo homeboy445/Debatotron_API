@@ -87,6 +87,7 @@ const Register = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
         .catch(trx.rollback);
     })
     .catch((err) => {
+      console.log("sgn_in: ", err);
       res.status(400).json("unable to register!");
     });
 };

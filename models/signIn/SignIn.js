@@ -22,11 +22,12 @@ const SignIn = (res, jwt, bcrypt, postgres, email, password, getJwtToken) => {
       }
       const token = await getJwtToken(jwt, postgres, email, response[0].hash);
       if (!token) {
-        return res.sendState(401);
+        return res.sendStatus(401);
       }
       res.json(token);
     })
     .catch((err) => {
+      console.log("sgn_in: ", err);
       res.status(500).json("Failed!");
     });
 };
