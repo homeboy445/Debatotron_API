@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 /**
  * Verify the user...
  * @param {*} req 
