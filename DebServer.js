@@ -99,10 +99,10 @@ app.post("/signin", (req, res) => {
         return res.sendState(401);
       }
       res.json(token);
-    }).catch(err=>{
-      console.log(err);
-      res.status(500).json("Failed!");
     })
+    .catch((err) => {
+      res.status(500).json("Failed!");
+    });
 });
 
 app.post("/register", (req, res) => {
@@ -636,12 +636,39 @@ app.post("/MakeFriendReq", authenticate, (req, res) => {
     });
 });
 
-app.post("/AddFriend", authenticate, (req, res) => {
+app.post("/AddFriend", authenticate, async (req, res) => {
   /**
    *  Add user1 is the one who sent the request in the first place whereas user2
    *  is who recieved it.
    */
   const { user1, user2 } = req.body;
+  let status = await postgres("friends")
+    .select("*")
+    .where({ user_name: user1, friend_name: user2 })
+    .then((response) => {
+      if (response.length > 0) {
+        return true;
+      }
+      throw response;
+    })
+    .catch((err) => {
+      return false;
+    });
+  status |= await postgres("friends")
+    .select("*")
+    .where({ user_name: user2, friend_name: user1 })
+    .then((response) => {
+      if (response.length > 0) {
+        return true;
+      }
+      throw response;
+    })
+    .catch((err) => {
+      return false;
+    });
+  if (status) {
+    return res.json("Already sent!");
+  }
   postgres("friends")
     .update({ status: true })
     .where({ user_name: user1, friend_name: user2 })
@@ -725,7 +752,7 @@ app.get("/Inbox/:user", authenticate, (req, res) => {
   postgres
     .select("*")
     .from("inbox")
-    .where({touser: user})
+    .where({ touser: user })
     .then((response) => {
       if (response.length < 1) {
         return res.json("none");
