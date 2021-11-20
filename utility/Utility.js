@@ -66,7 +66,7 @@ const getJwtToken = async (jwt, postgres, email, hash) => {
     { email: email, password: hash },
     process.env.ACCESS_TOKEN_KEY,
     {
-      expiresIn: "15m",
+      expiresIn: "5m",
     }
   );
   token.refreshToken = jwt.sign(

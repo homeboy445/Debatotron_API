@@ -1032,7 +1032,15 @@ app.get("/popularUsers", authenticate, (req, res) => {
           finalResults[i].name
         );
       }
-      res.json(finalResults);
+      const ls = {},
+        result = [];
+      finalResults.map((item) => {
+        ls[item.name] = item;
+      });
+      for (const key in ls) {
+        result.push(ls[key]);
+      }
+      res.json(result);
     })
     .catch((err) => {
       res.status(400).json("Failed to fetch!");
