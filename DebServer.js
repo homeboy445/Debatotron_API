@@ -627,11 +627,10 @@ app.post("/MakeFriendReq", authenticate, (req, res) => {
         }),
         messageid: uuidv4(),
       };
-      let res = await AppendMessageToInbox(postgres, data);
+      await AppendMessageToInbox(postgres, data);
       res.json(response);
     })
     .catch((err) => {
-      console.log(err);
       res.status(400).json(null);
     });
 });
