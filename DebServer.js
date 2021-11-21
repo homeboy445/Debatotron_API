@@ -1032,8 +1032,7 @@ app.get("/popularUsers", authenticate, (req, res) => {
           finalResults[i].name
         );
       }
-      const ls = {},
-        result = [];
+      const ls = {}; result = [];
       finalResults.map((item) => {
         ls[item.name] = item;
       });
