@@ -1087,23 +1087,28 @@ app.get("/topContributors", authenticate, (req, res) => {
 
 app.post("/likepost", authenticate, async (req, res) => {
   const { id, type, data, userid, typeoflike } = req.body;
-  let status = await postgres
+  let status = await postgres("feedlikes")
     .select("typeoflike")
     .where({ id: id, userid: userid, type: type })
-    .then((response) => {
-      console.log("=> ", response);
+    .then(async (response) => {
+      if (response.length === 0) {
+        return true;
+      }
       if (response[0].typeoflike !== typeoflike) {
         data[response[0].typeoflike] = Math.max(
           data[response[0].typeoflike] - 1,
           0
         );
+        await postgres("feedlikes")
+          .update({ typeoflike: typeoflike })
+          .where({ id: id, userid: userid, type: type })
+          .then((response) => {});
         return true;
       }
       throw response;
     })
     .catch((err) => false);
   if (status) {
-    console.log("I'M HERE!");
     return res.json("Done!");
   }
   if (type === "post") {
@@ -1124,7 +1129,6 @@ app.post("/likepost", authenticate, async (req, res) => {
           });
       })
       .catch((err) => {
-        console.log("1. -> ", err);
         res.status(500).json("Failed!");
       });
   }
@@ -1146,7 +1150,6 @@ app.post("/likepost", authenticate, async (req, res) => {
           });
       })
       .catch((err) => {
-        console.log("2. -> ", err);
         res.status(500).json("Failed!");
       });
   }
