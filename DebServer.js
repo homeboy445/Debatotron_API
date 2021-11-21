@@ -1085,7 +1085,7 @@ app.get("/topContributors", authenticate, (req, res) => {
     });
 });
 
-app.get("/getfeedlikes/:id", (req, res) => {
+app.get("/getfeedlikes/:id", authenticate, (req, res) => {
   const { id } = req.params;
   postgres
     .select("*")
