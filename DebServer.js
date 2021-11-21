@@ -1085,6 +1085,18 @@ app.get("/topContributors", authenticate, (req, res) => {
     });
 });
 
+app.get("/getfeedlikes", (req, res) => {
+  postgres
+    .select("*")
+    .from("feedlikes")
+    .then((response) => {
+      res.json(response);
+    })
+    .catch((err) => {
+      res.status(500).json("Failed!");
+    });
+});
+
 app.post("/likepost", authenticate, async (req, res) => {
   const { id, type, data, userid, typeoflike } = req.body;
   let status = await postgres("feedlikes")
