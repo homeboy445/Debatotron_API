@@ -1091,6 +1091,7 @@ app.post("/likepost", authenticate, async (req, res) => {
     .select("typeoflike")
     .where({ id: id, userid: userid, type: type })
     .then((response) => {
+      console.log("=> ", response);
       if (response[0].typeoflike !== typeoflike) {
         data[response[0].typeoflike] = Math.max(
           data[response[0].typeoflike] - 1,
