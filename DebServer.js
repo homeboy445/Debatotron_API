@@ -1102,6 +1102,7 @@ app.post("/likepost", authenticate, async (req, res) => {
     })
     .catch((err) => false);
   if (status) {
+    console.log("I'M HERE!");
     return res.json("Done!");
   }
   if (type === "post") {
@@ -1122,13 +1123,14 @@ app.post("/likepost", authenticate, async (req, res) => {
           });
       })
       .catch((err) => {
+        console.log("1. -> ", err);
         res.status(500).json("Failed!");
       });
   }
   if (type === "debate") {
     return postgres("debate")
       .update({ likes: data })
-      .where({ id: id })
+      .where({ debid: id })
       .then((response) => {
         postgres
           .insert({
@@ -1143,6 +1145,7 @@ app.post("/likepost", authenticate, async (req, res) => {
           });
       })
       .catch((err) => {
+        console.log("2. -> ", err);
         res.status(500).json("Failed!");
       });
   }
