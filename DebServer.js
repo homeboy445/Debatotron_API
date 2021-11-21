@@ -1088,7 +1088,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
   const { id } = req.params; //TODO: Alter this route to show the results specify to a particular user.
   let feed = [];
   postgres
-    .select("publisher", "publishedat", "topic", "debid")
+    .select("publisher", "publishedat", "topic", "debid", "likes")
     .from("debate")
     .then(async (response) => {
       feed = response.map((item) => {
@@ -1100,6 +1100,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
             title: item.topic,
           },
           publishedAt: item.publishedat,
+          likes: item.likes
         };
       });
       let arr = await postgres
@@ -1115,6 +1116,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
                 id: item.id,
               },
               publishedAt: item.publishedat,
+              likes: item.likes
             };
           });
         });
@@ -1130,7 +1132,6 @@ app.get("/feed/:id", authenticate, (req, res) => {
       res.json(result);
     })
     .catch((err) => {
-      console.log(err);
       res.status(400).json("Failed to fetch!");
     });
 });
