@@ -1032,7 +1032,8 @@ app.get("/popularUsers", authenticate, (req, res) => {
           finalResults[i].name
         );
       }
-      const ls = {}; result = [];
+      const ls = {};
+      result = [];
       finalResults.map((item) => {
         ls[item.name] = item;
       });
@@ -1084,6 +1085,69 @@ app.get("/topContributors", authenticate, (req, res) => {
     });
 });
 
+app.post("/likepost", authenticate, async (req, res) => {
+  const { id, type, data, userid, typeoflike } = req.body;
+  let status = await postgres
+    .select("typeoflike")
+    .where({ id: id, userid: userid, type: type })
+    .then((response) => {
+      if (response[0].typeoflike !== typeoflike) {
+        data[response[0].typeoflike] = Math.max(
+          data[response[0].typeoflike] - 1,
+          0
+        );
+        return true;
+      }
+      throw response;
+    })
+    .catch((err) => false);
+  if (status) {
+    return res.json("Done!");
+  }
+  if (type === "post") {
+    return postgres("feed")
+      .update({ likes: data })
+      .where({ id: id })
+      .then((response) => {
+        postgres
+          .insert({
+            id: id,
+            userid: userid,
+            type: type,
+            typeoflike: typeoflike,
+          })
+          .into("feedlikes")
+          .then((response) => {
+            res.json("Done!");
+          });
+      })
+      .catch((err) => {
+        res.status(500).json("Failed!");
+      });
+  }
+  if (type === "debate") {
+    return postgres("debate")
+      .update({ likes: data })
+      .where({ id: id })
+      .then((response) => {
+        postgres
+          .insert({
+            id: id,
+            userid: userid,
+            type: type,
+            typeoflike: typeoflike,
+          })
+          .into("feedlikes")
+          .then((response) => {
+            res.json("Done!");
+          });
+      })
+      .catch((err) => {
+        res.status(500).json("Failed!");
+      });
+  }
+});
+
 app.get("/feed/:id", authenticate, (req, res) => {
   const { id } = req.params; //TODO: Alter this route to show the results specify to a particular user.
   let feed = [];
@@ -1100,7 +1164,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
             title: item.topic,
           },
           publishedAt: item.publishedat,
-          likes: item.likes
+          likes: item.likes,
         };
       });
       let arr = await postgres
@@ -1116,7 +1180,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
                 id: item.id,
               },
               publishedAt: item.publishedat,
-              likes: item.likes
+              likes: item.likes,
             };
           });
         });
