@@ -1090,7 +1090,7 @@ app.get("/getfeedlikes/:id", authenticate, (req, res) => {
   postgres
     .select("*")
     .from("feedlikes")
-    .where({userid: id})
+    .where({ userid: id })
     .then((response) => {
       res.json(response);
     })
@@ -1106,7 +1106,7 @@ app.post("/likepost", authenticate, async (req, res) => {
     .where({ id: id, userid: userid, type: type })
     .then(async (response) => {
       if (response.length === 0) {
-        return true;
+        return 1e9;
       }
       if (response[0].typeoflike !== typeoflike) {
         data[response[0].typeoflike] = Math.max(
@@ -1117,12 +1117,12 @@ app.post("/likepost", authenticate, async (req, res) => {
           .update({ typeoflike: typeoflike })
           .where({ id: id, userid: userid, type: type })
           .then((response) => {});
-        return true;
+        return 10;
       }
       throw response;
     })
-    .catch((err) => false);
-  if (status) {
+    .catch((err) => 11);
+  if (status === 11) {
     return res.json("Done!");
   }
   if (type === "post") {
@@ -1130,6 +1130,9 @@ app.post("/likepost", authenticate, async (req, res) => {
       .update({ likes: data })
       .where({ id: id })
       .then((response) => {
+        if (status !== 1e9) {
+          return;
+        }
         postgres
           .insert({
             id: id,
@@ -1151,6 +1154,9 @@ app.post("/likepost", authenticate, async (req, res) => {
       .update({ likes: data })
       .where({ debid: id })
       .then((response) => {
+        if (status !== 1e9) {
+          return;
+        }
         postgres
           .insert({
             id: id,
