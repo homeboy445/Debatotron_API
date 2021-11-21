@@ -1085,10 +1085,12 @@ app.get("/topContributors", authenticate, (req, res) => {
     });
 });
 
-app.get("/getfeedlikes", (req, res) => {
+app.get("/getfeedlikes/:id", (req, res) => {
+  const { id } = req.params;
   postgres
     .select("*")
     .from("feedlikes")
+    .where({userid: id})
     .then((response) => {
       res.json(response);
     })
