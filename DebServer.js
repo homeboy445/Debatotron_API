@@ -1173,6 +1173,7 @@ app.post("/likepost", authenticate, async (req, res) => {
         res.status(500).json("Failed!");
       });
   }
+  res.status(400).json("Failed!");
 });
 
 app.get("/feed/:id", authenticate, (req, res) => {
