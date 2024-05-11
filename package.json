@@ -2,9 +2,10 @@
   "name": "debatotron",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "DebServer.js",
   "scripts": {
-    "start": "nodemon DebServer.js"
+    "start": "node .",
+    "devStart": "nodemon DebServer.js"
   },
   "author": "",
   "license": "ISC",
@@ -15,8 +16,10 @@
     "express": "^4.17.1",
     "jsonwebtoken": "^8.5.1",
     "knex": "^0.21.2",
-    "nodemon": "^2.0.4",
     "pg": "^8.3.0",
     "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4"
   }
 }
