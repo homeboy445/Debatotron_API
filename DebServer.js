@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const PORT = process.env.PORT || 3005;
 const app = express();
@@ -21,20 +22,27 @@ const saltRounds = 10;
 const knex = require("knex");
 const { SignIn } = require("./models/signIn/SignIn");
 const { authenticate } = require("./middleware/Authenticate");
+const { LIKE_STATUS } = require("./enums/enums");
+const { RESPONSE_STATUS } = require("./enums/response");
 
 const postgres = knex({
   client: "pg",
   connection: {
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    // connectionString: process.env.DATABASE_URL,
+    ssl: false,
+    host: 'localhost',
+    port: '5432',
+    user: 'postgres',
+    database: 'debatotron',
+    password: '12345'
   },
-  production: {
-    client: "pg",
-    connection: {
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-    },
-  },
+  // production: {
+  //   client: "pg",
+  //   connection: {
+  //     connectionString: process.env.DATABASE_URL,
+  //     ssl: { rejectUnauthorized: false },
+  //   },
+  // },
 });
 
 /**
@@ -102,12 +110,21 @@ app.post("/refresh", (req, res) => {
       }
     })
     .catch((err) => {
+      console.log("Error while refreshing token: ", err);
       res.sendStatus(401);
     });
 });
 
 app.get("/", (req, res) => {
-  res.json("The Server's Live!");
+  postgres("test")
+  .select("*")
+  .then((response) => {
+    res.json("The Server's Live! " + JSON.stringify(response));
+  })
+  .catch(e => {
+    console.log(e);
+    res.json("Failed!");
+  })
 });
 
 app.post("/ForgotPassword", (req, res) => {
@@ -285,7 +302,6 @@ app.get("/profile/:id", authenticate, (req, res) => {
 
 app.get("/debcount/:user", authenticate, (req, res) => {
   const { user } = req.params;
-  var user_object = [];
   postgres
     .select("users.name")
     .count("debate.debid")
@@ -905,7 +921,8 @@ app.get("/getLikes/:debId/:userId", authenticate, (req, res) => {
       res.json(response);
     })
     .catch((err) => {
-      return;
+      console.log("error in /getLikes route: ", err);
+      res.status(500).json(RESPONSE_STATUS.ERROR);
     });
 });
 
@@ -927,50 +944,60 @@ app.post("/changeSide", authenticate, (req, res) => {
     });
 });
 
-app.post("/UpdateLike", authenticate, (req, res) => {
+app.post("/UpdateLike", authenticate, async (req, res) => {
   const { debId, user, userId, commentId, comment, value, state } = req.body;
-  postgres("comments")
-    .update({
-      likes: value,
-    })
-    .where({
-      commentid: commentId,
-    })
-    .then(async (response) => {
-      let r = await postgres
+
+  console.log("## ", req.body);
+  try {
+    // Update the likes count in the comments table
+    await postgres("comments")
+      .update({ likes: value, userid: userId })
+      .where({ commentid: commentId });
+
+
+    if (parseInt(value) > 0) {
+      console.log("inserting value into table!");
+      // Insert a new like record
+      await postgres
         .insert({
           debid: debId,
           userid: userId,
           commentid: commentId,
         })
-        .into("likes")
-        .then((response) => {
-          return "Done!";
-        })
-        .catch((err) => {
-          throw err;
-        });
-      const inboxData = {
-        message: `A user liked your comment \"${comment}\" in this <a href="/DebPage/${debId}">debate</a>. Go check it out!`,
-        byuser: "DebManager",
-        touser: user,
-        additional: JSON.stringify({
-          type: "like",
-          user: user,
-          debid: debId,
-          title: "A user liked your comment",
-          rtype: 6,
-        }),
-        messageid: uuidv4(),
-      };
-      if (state) {
-        await AppendMessageToInbox(postgres, inboxData);
-      }
-      return res.json(r);
-    })
-    .catch((err) => {
-      res.status(500).json("Failed!");
-    });
+        .into("likes");
+    } else {
+      console.log("deleting value from table!");
+      await postgres("likes")
+      .del()
+      .where({ commentid: commentId });
+    }
+
+    // Prepare inbox message data
+    const inboxData = {
+      message: `A user liked your comment \"${comment}\" in this <a href="/DebPage/${debId}">debate</a>. Go check it out!`,
+      byuser: "DebManager",
+      touser: user,
+      additional: JSON.stringify({
+        type: "like",
+        user: user,
+        debid: debId,
+        title: "A user liked your comment",
+        rtype: 6,
+      }),
+      messageid: uuidv4(),
+    };
+
+    // Conditionally append a message to the user's inbox
+    if (state) {
+      await AppendMessageToInbox(postgres, inboxData);
+    }
+
+    // Respond with success
+    res.json(RESPONSE_STATUS.SUCCESS);
+  } catch (err) {
+    console.error("Error in /UpdatesLikes route: ", err);
+    res.status(500).json(RESPONSE_STATUS.ERROR);
+  }
 });
 
 app.post("/UpdateProfile", authenticate, (req, res) => {
@@ -1006,6 +1033,7 @@ app.post("/makePost", authenticate, (req, res) => {
       res.json("Done!");
     })
     .catch((err) => {
+      console.log(">> /makePost: ", err);
       res.status(400).json("Failed to post!");
     });
 });
@@ -1043,6 +1071,7 @@ app.get("/popularUsers", authenticate, (req, res) => {
       res.json(result);
     })
     .catch((err) => {
+      console.log("Error in /popularUsers path: ", err);
       res.status(400).json("Failed to fetch!");
     });
 });
@@ -1095,86 +1124,66 @@ app.get("/getfeedlikes/:id", authenticate, (req, res) => {
       res.json(response);
     })
     .catch((err) => {
-      res.status(500).json("Failed!");
+      console.log("Error in /getfeedlikes route: ", err);
+      res.status(500).json(RESPONSE_STATUS.FAILURE);
     });
 });
 
 app.post("/likepost", authenticate, async (req, res) => {
+
   const { id, type, data, userid, typeoflike } = req.body;
-  let status = await postgres("feedlikes")
-    .select("typeoflike")
-    .where({ id: id, userid: userid, type: type })
-    .then(async (response) => {
-      if (response.length === 0) {
-        return 1e9;
-      }
-      if (response[0].typeoflike !== typeoflike) {
-        data[response[0].typeoflike] = Math.max(
-          data[response[0].typeoflike] - 1,
-          0
-        );
-        await postgres("feedlikes")
-          .update({ typeoflike: typeoflike })
-          .where({ id: id, userid: userid, type: type })
-          .then((response) => {});
-        return 10;
-      }
-      throw response;
-    })
-    .catch((err) => 11);
-  if (status === 11) {
-    return res.json("Done!");
-  }
-  if (type === "post") {
-    return postgres("feed")
-      .update({ likes: data })
-      .where({ id: id })
-      .then((response) => {
-        if (status !== 1e9) {
-          return;
+
+  try {
+    const status = await postgres("feedlikes")
+      .select("typeoflike")
+      .where({ id: id, userid: userid, type: type })
+      .then(async (response) => {
+        if (response.length === 0) {
+          return LIKE_STATUS.NEW; // Unique code indicating a new like
         }
-        postgres
-          .insert({
-            id: id,
-            userid: userid,
-            type: type,
-            typeoflike: typeoflike,
-          })
-          .into("feedlikes")
-          .then((response) => {
-            res.json("Done!");
-          });
+        if (response[0].typeoflike !== typeoflike) {
+          data[response[0].typeoflike] = Math.max(data[response[0].typeoflike] - 1, 0);
+          await postgres("feedlikes")
+            .update({ typeoflike: typeoflike })
+            .where({ id: id, userid: userid, type: type });
+          return LIKE_STATUS.UPDATE; // Code indicating an update
+        }
       })
       .catch((err) => {
-        res.status(500).json("Failed!");
+        console.error("Error in /likepost route (while fetching typeofLike): ", err);
       });
+
+    if (status === LIKE_STATUS.NEW || status === LIKE_STATUS.UPDATE) {
+      await updateLikes(id, type, data, userid, typeoflike, status);
+      res.json(RESPONSE_STATUS.SUCCESS);
+    } else {
+      res.status(400).json(RESPONSE_STATUS.INVALID);
+    }
+  } catch (err) {
+    console.error("Error in /likepost route (main): ", err);
+    res.status(500).json(RESPONSE_STATUS.ERROR);
   }
-  if (type === "debate") {
-    return postgres("debate")
-      .update({ likes: data })
-      .where({ debid: id })
-      .then((response) => {
-        if (status !== 1e9) {
-          return;
-        }
-        postgres
-          .insert({
-            id: id,
-            userid: userid,
-            type: type,
-            typeoflike: typeoflike,
-          })
-          .into("feedlikes")
-          .then((response) => {
-            res.json("Done!");
-          });
-      })
-      .catch((err) => {
-        res.status(500).json("Failed!");
-      });
-  }
-  res.status(400).json("Failed!");
 });
+
+async function updateLikes(id, type, data, userid, typeoflike, status) {
+  const table = type === "post" ? "feed" : "debate";
+  const columnId = type === "post" ? "id" : "debid";
+
+  try {
+    await postgres(table)
+      .update({ likes: JSON.stringify(data) })
+      .where({ [columnId]: id });
+
+    if (status === LIKE_STATUS.NEW) { // New like
+      await postgres
+        .insert({ id: id, userid: userid, type: type, typeoflike: typeoflike })
+        .into("feedlikes");
+    }
+  } catch (err) {
+    console.error(`Error updating likes for ${type}: `, err);
+    throw new Error("Failed to update likes");
+  }
+}
 
 app.get("/feed/:id", authenticate, (req, res) => {
   const { id } = req.params; //TODO: Alter this route to show the results specify to a particular user.
@@ -1192,7 +1201,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
             title: item.topic,
           },
           publishedAt: item.publishedat,
-          likes: item.likes,
+          likes: item.likes || {},
         };
       });
       let arr = await postgres
@@ -1224,6 +1233,7 @@ app.get("/feed/:id", authenticate, (req, res) => {
       res.json(result);
     })
     .catch((err) => {
+      console.log(">> error in feed path: ", err);
       res.status(400).json("Failed to fetch!");
     });
 });

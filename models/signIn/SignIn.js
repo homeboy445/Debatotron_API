@@ -17,10 +17,12 @@ const SignIn = async (res, jwt, bcrypt, postgres, email, password, getJwtToken) 
       if (response.length === 0) {
         throw response;
       }
-      if (!bcrypt.compareSync(password, response[0].hash)) {
+      const passwordMatchResult = await bcrypt.compare(password, response[0].hash);
+      if (!passwordMatchResult) {
         return res.sendStatus(401);
       }
       const token = await getJwtToken(jwt, postgres, email, response[0].hash);
+      console.log("~~> ", token);
       if (!token) {
         return res.sendStatus(401);
       }

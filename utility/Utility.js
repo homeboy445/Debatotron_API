@@ -6,12 +6,13 @@ const FindNameintheTarget = (Name, Target) => {
 
 const AppendMessageToInbox = async (postgres, data) => {
   data["recievedat"] = new Date().toLocaleDateString();
-  return await postgres("inbox")
+  return postgres("inbox")
     .insert(data)
-    .then((response) => {
+    .then(() => {
       return true;
     })
     .catch((err) => {
+      console.log("error while storing in inbox: ", err, " ", data.additional);
       return err;
     });
 };
@@ -62,6 +63,7 @@ const getImagebyUser = async (postgres, user) => {
  */
 const getJwtToken = async (jwt, postgres, email, hash) => {
   const token = {};
+  console.log(">> ", process.env.ACCESS_TOKEN_KEY);
   token.accessToken = jwt.sign(
     { email: email, password: hash },
     process.env.ACCESS_TOKEN_KEY,
@@ -92,6 +94,7 @@ const getJwtToken = async (jwt, postgres, email, hash) => {
       return token;
     })
     .catch((err) => {
+      console.log("Some error: ", err);
       return false;
     });
 };

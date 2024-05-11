@@ -22,17 +22,18 @@ const EmailParser = (email) => {
  * @param {*} uuidv4 
  * @returns 
  */
-const Register = (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
+const Register = async (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
   const { user, email, password, recovery, answer } = req.body;
   var mailP = EmailParser(email);
+  console.log("Request for registration has been made!");
   if (!email || !user || !password) {
     return res.status(400).json("Nothing recieved!");
   }
-  if (mailP !== "gmail" && mailP !== "yahoo") {
+  if (false && mailP !== "gmail" && mailP !== "yahoo") {
     return res.status(400).json("Enter a valid email!");
   }
-  const hash = bcrypt.hashSync(password, saltRounds);
-  const answer_hash = bcrypt.hashSync(answer, saltRounds);
+  const hash = await bcrypt.hash(password, saltRounds);
+  const answer_hash = await bcrypt.hash(answer, saltRounds); // this is the answer we recieve as the security!
   postgres
     .transaction((trx) => {
       trx
