@@ -61,6 +61,10 @@ const postgres = knex({
 app.use(cors());
 app.use(express.json());
 
+app.get("/ping", (req, res) => {
+  res.json("pong!");
+});
+
 app.post("/signin", (req, res) => {
   const { email, password } = req.body;
   SignIn(res, jwt, bcrypt, postgres, email, password, getJwtToken);
