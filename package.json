@@ -4,7 +4,7 @@
   "description": "",
   "main": "DebServer.js",
   "scripts": {
-    "start": "node .",
+    "start": "node DebServer.js",
     "devStart": "nodemon DebServer.js"
   },
   "author": "",
