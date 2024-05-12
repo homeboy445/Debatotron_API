@@ -117,15 +117,7 @@ app.post("/refresh", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  postgres("test")
-  .select("*")
-  .then((response) => {
-    res.json("The Server's Live! " + JSON.stringify(response));
-  })
-  .catch(e => {
-    console.log(e);
-    res.json("Failed!");
-  })
+  res.json("Server's live!");
 });
 
 app.post("/ForgotPassword", (req, res) => {
