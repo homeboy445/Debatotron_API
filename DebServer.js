@@ -24,26 +24,10 @@ const { SignIn } = require("./models/signIn/SignIn");
 const { authenticate } = require("./middleware/Authenticate");
 const { LIKE_STATUS } = require("./enums/enums");
 const { RESPONSE_STATUS } = require("./enums/response");
+const dbConfig = require("./db/config");
+const environment = process.env.NODE_ENV || 'development';
 
-const postgres = knex({
-  client: "pg",
-  connection: {
-    // connectionString: process.env.DATABASE_URL,
-    ssl: false,
-    host: 'localhost',
-    port: '5432',
-    user: 'postgres',
-    database: 'debatotron',
-    password: '12345'
-  },
-  // production: {
-  //   client: "pg",
-  //   connection: {
-  //     connectionString: process.env.DATABASE_URL,
-  //     ssl: { rejectUnauthorized: false },
-  //   },
-  // },
-});
+const postgres = knex(dbConfig[environment]);
 
 /**
  *  --Types of requests--
@@ -63,6 +47,19 @@ app.use(express.json());
 
 app.get("/ping", (req, res) => {
   res.json("pong!");
+});
+
+app.get("/storeTmp/:id", (req, res) => {
+  const { id } = req.params;
+  postgres("tmp")
+    .insert({ id: id })
+    .then((response) => {
+      res.json("This worked: " + id);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(400).json("Error!");
+    });
 });
 
 app.post("/signin", (req, res) => {

@@ -80,8 +80,9 @@ const Register = async (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
                   }),
                   messageid: uuidv4(),
                 })
-                .then((response) => {})
-                .catch((err) => {});
+                .catch((err) => {
+                  console.log("error while inserting into inbox: ", err);
+                });
             });
         })
         .then(trx.commit)
