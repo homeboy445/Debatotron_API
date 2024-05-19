@@ -144,18 +144,21 @@ app.post("/CheckRecovery", (req, res) => {
     .where({
       email: email,
     })
-    .then((response) => {
+    .then(async (response) => {
       if (response[0].email) {
         var result = false;
-        result = bcrypt.compareSync(answer, response[0].answer);
+        result = await bcrypt.compare(answer, response[0].answer);
         if (result == true) {
-          res.json("Found!");
+          res.json(1);
+        } else {
+          res.json(0);
         }
       } else {
-        res.json("User Does not exists!");
+        res.json(0);
       }
     })
     .catch((err) => {
+      console.log("error occured on /CheckRecovery: ", err);
       res.status(400).json("An Error has occured!");
     });
 });
@@ -171,9 +174,9 @@ app.post("/ChangePassword", (req, res) => {
     .where("email", "=", email)
     .then((response) => {
       if (response.length > 0) {
-        res.json("Successfull!");
+        res.json(1);
       } else {
-        res.json("Couldn't Change your Password!");
+        res.json(0);
       }
     })
     .catch((err) => {

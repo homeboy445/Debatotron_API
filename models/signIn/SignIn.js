@@ -22,7 +22,6 @@ const SignIn = async (res, jwt, bcrypt, postgres, email, password, getJwtToken) 
         return res.sendStatus(401);
       }
       const token = await getJwtToken(jwt, postgres, email, response[0].hash);
-      console.log("~~> ", token);
       if (!token) {
         return res.sendStatus(401);
       }

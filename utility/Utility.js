@@ -1,6 +1,5 @@
 const FindNameintheTarget = (Name, Target) => {
   var NameArray = Target.split("|");
-  console.log(NameArray, " ", Target, " ", Name);
   return NameArray.find((ele) => ele == Name) === Name;
 };
 
@@ -63,7 +62,6 @@ const getImagebyUser = async (postgres, user) => {
  */
 const getJwtToken = async (jwt, postgres, email, hash) => {
   const token = {};
-  console.log(">> ", process.env.ACCESS_TOKEN_KEY);
   token.accessToken = jwt.sign(
     { email: email, password: hash },
     process.env.ACCESS_TOKEN_KEY,

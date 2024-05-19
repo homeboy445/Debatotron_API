@@ -25,7 +25,6 @@ const EmailParser = (email) => {
 const Register = async (req, res, postgres, bcrypt, saltRounds, uuidv4) => {
   const { user, email, password, recovery, answer } = req.body;
   var mailP = EmailParser(email);
-  console.log("Request for registration has been made!");
   if (!email || !user || !password) {
     return res.status(400).json("Nothing recieved!");
   }
