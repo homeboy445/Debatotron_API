@@ -569,7 +569,7 @@ app.post("/MakeFriendReq", authenticate, (req, res) => {
     .insert({
       user_name: user,
       friend_name: fuser,
-      req_recieved: message,
+      req_received: message,
       req_code: user + "_" + fuser,
     })
     .then(async (response) => {
@@ -590,6 +590,7 @@ app.post("/MakeFriendReq", authenticate, (req, res) => {
       res.json(response);
     })
     .catch((err) => {
+      console.log("Error in making friend: ", err);
       res.status(400).json(null);
     });
 });
